@@ -7,12 +7,13 @@ import os
 import datetime
 import uuid
 import glob
-from datasets import load_dataset, Dataset, concatenate_datasets
-import gspread
-from google.oauth2.service_account import Credentials
+from supabase import create_client, Client
 
-# ---- CONFIG ----
-HF_DATASET_REPO = "okrusch/mos_results"
+# --- Supabase connection ---
+url: str =  st.secrets["supabase"]["url"]
+key: str = st.secrets["supabase"]["key"]
+supabase: Client = create_client(url, key)
+
 
 # ---- SESSION STATE ----
 if "current_audio" not in st.session_state:
@@ -30,14 +31,6 @@ if "audio_data" not in st.session_state:
             st.session_state.audio_data.append((os.path.basename(file), data))  # (dataset_name, list of URLs)
 
 
-# Google Sheets connection
-scope = ["https://www.googleapis.com/auth/spreadsheets"]
-creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
-client = gspread.authorize(creds)
-
-# Open your sheet by name or URL
-sheet = client.open("Mos Ratings").sheet1
-
 # Session title
 st.title("🎧 Progressive MOS Study")
 st.markdown("""
@@ -54,29 +47,23 @@ def pick_random_audio():
     return dataset_name, audio_url
 
 def save_rating(dataset_name, audio_url, rating):
-    if rating != 'No answer':
-        new_row = {
-            "timestamp": datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
-            "user_id": st.session_state.user_id,
-            "dataset": dataset_name,
-            "audio_url": audio_url,
-            "rating": int(rating)
-        }
+    new_row = {
+        "user_id": st.session_state.user_id,
+        "dataset": dataset_name,
+        "audio_url": audio_url,
+        "rating": int(rating)
+    }
 
-        # Load existing dataset from Hugging Face
-        dataset = load_dataset(HF_DATASET_REPO, split='train', use_auth_token=st.secrets["HF_TOKEN"])
-
-        # Append new row
-        dataset = concatenate_datasets([dataset, Dataset.from_dict([new_row])])
-
-        # Push back to Hugging Face
-        dataset.push_to_hub(HF_DATASET_REPO, token=st.secrets["HF_TOKEN"])
-        st.success("Rating saved!")
-        return True
+    response = supabase.table("MOS").insert(new_row).execute()
+    if response != None:
+        st.success("✅ Data saved to Supabase!")
     else:
-        st.error(f"No rating provided!")
-        return False
+        st.error("❌ Something went wrong!")
 
+    
+    st.success("Rating saved!")
+    return True
+    
 def set_audio():
     # ---- DISPLAY AUDIO AND RATING ----
     if st.session_state.current_audio is None:
@@ -103,7 +90,6 @@ col1, col2 = st.columns(2)
 
 with col2:
     if st.button("Next"):
-        sheet.append_row([1, 2, 3])
         # Save rating
         saved = save_rating(dataset_name, audio_url, rating)
         if saved:
