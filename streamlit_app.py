@@ -23,7 +23,7 @@ if "user_id" not in st.session_state:
 # ---- LOAD ALL AUDIO LINKS ----
 if "audio_data" not in st.session_state:
     st.session_state.audio_data = []
-    for file in glob.glob("src/audio_links/*.json"):
+    for file in glob.glob("audio_links/*.json"):
         with open(file, "r") as f:
             data = json.load(f)["dataset"]
             st.session_state.audio_data.append((os.path.basename(file), data))  # (dataset_name, list of URLs)
