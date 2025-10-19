@@ -53,11 +53,16 @@ def save_rating(dataset_name, audio_url, rating):
             "rating": int(rating)
         }
 
-        # Load existing dataset from Hugging Face
-        dataset = load_dataset(HF_DATASET_REPO, split='train', use_auth_token=st.secrets["HF_TOKEN"])
-
-        # Append new row
-        dataset = concatenate_datasets([dataset, Dataset.from_dict([new_row])])
+        try:
+            # Try to load existing dataset
+            dataset = load_dataset(HF_DATASET_REPO, split="train", use_auth_token=st.secrets["HF_TOKEN"])
+             # Append new row
+            dataset = concatenate_datasets([dataset, Dataset.from_dict([new_row])])
+            
+        except Exception as e:
+            print("Dataset not found or empty — creating new one:", e)
+            # Initialize new dataset
+            dataset = Dataset.from_dict([new_row])
 
         # Push back to Hugging Face
         dataset.push_to_hub(HF_DATASET_REPO, token=st.secrets["HF_TOKEN"])
