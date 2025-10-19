@@ -8,6 +8,8 @@ import datetime
 import uuid
 import glob
 from datasets import load_dataset, Dataset, concatenate_datasets
+import gspread
+from google.oauth2.service_account import Credentials
 
 # ---- CONFIG ----
 HF_DATASET_REPO = "okrusch/mos_results"
@@ -19,7 +21,6 @@ if "current_audio" not in st.session_state:
 if "user_id" not in st.session_state:
     st.session_state.user_id = uuid.uuid4().hex[:8]
 
-
 # ---- LOAD ALL AUDIO LINKS ----
 if "audio_data" not in st.session_state:
     st.session_state.audio_data = []
@@ -27,6 +28,15 @@ if "audio_data" not in st.session_state:
         with open(file, "r") as f:
             data = json.load(f)["dataset"]
             st.session_state.audio_data.append((os.path.basename(file), data))  # (dataset_name, list of URLs)
+
+
+# Google Sheets connection
+scope = ["https://www.googleapis.com/auth/spreadsheets"]
+creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
+client = gspread.authorize(creds)
+
+# Open your sheet by name or URL
+sheet = client.open("Mos Ratings").sheet1
 
 # Session title
 st.title("🎧 Progressive MOS Study")
@@ -53,16 +63,11 @@ def save_rating(dataset_name, audio_url, rating):
             "rating": int(rating)
         }
 
-        try:
-            # Try to load existing dataset
-            dataset = load_dataset(HF_DATASET_REPO, split="train", use_auth_token=st.secrets["HF_TOKEN"])
-             # Append new row
-            dataset = concatenate_datasets([dataset, Dataset.from_dict([new_row])])
-            
-        except Exception as e:
-            print("Dataset not found or empty — creating new one:", e)
-            # Initialize new dataset
-            dataset = Dataset.from_dict([new_row])
+        # Load existing dataset from Hugging Face
+        dataset = load_dataset(HF_DATASET_REPO, split='train', use_auth_token=st.secrets["HF_TOKEN"])
+
+        # Append new row
+        dataset = concatenate_datasets([dataset, Dataset.from_dict([new_row])])
 
         # Push back to Hugging Face
         dataset.push_to_hub(HF_DATASET_REPO, token=st.secrets["HF_TOKEN"])
@@ -98,6 +103,7 @@ col1, col2 = st.columns(2)
 
 with col2:
     if st.button("Next"):
+        sheet.append_row([1, 2, 3])
         # Save rating
         saved = save_rating(dataset_name, audio_url, rating)
         if saved:
