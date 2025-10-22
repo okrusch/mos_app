@@ -38,10 +38,11 @@ if "audio_data" not in st.session_state:
 st.title("🎧 TTS Evaluation")
 st.markdown("""
 You will be presented with **one audio clip at a time**.  
-Rate its quality on a scale from 1–5 (1=bad, 5=good).
+Rate certain aspects on a scale of 1 to 5.
+
         
 - Click next to rate the next audio sample. Your progress will be automatically saved.
-- Before exiting click 'safe progress'.
+- Before leaving the page click 'safe progress' to save your current rating.
             
 
 Thank you for your participation!
@@ -68,16 +69,32 @@ def set_audio():
 default_rating = "No answer"
 
 # Initialize or reset session state BEFORE creating the radio
-if "rating" not in st.session_state:
-    st.session_state.rating = default_rating
+if "quality_rating" not in st.session_state:
+    st.session_state.quality_rating = default_rating
+if "naturalness_rating" not in st.session_state:
+    st.session_state.naturalness_rating = default_rating
+if "emotion_rating" not in st.session_state:
+    st.session_state.emotion_rating = default_rating
 
 # Radio button (uses session_state for its value)
 st.subheader('Rate this audio (1-5)')
 dataset_name, audio_url = set_audio()
-rating = st.radio(
-    "Quality:",
+quality_rating = st.radio(
+    "Audio Quality (1=bad, 5=good):",
     ["No answer", 1, 2, 3, 4, 5],
-    key="rating",
+    key="quality_rating",
+    horizontal=True
+)
+naturalness_rating = st.radio(
+    "Speech Naturalness (1=robotic, 5=real human):",
+    ["No answer", 1, 2, 3, 4, 5],
+    key="naturalness_rating",
+    horizontal=True
+)
+emotion_rating = st.radio(
+    "Emotion expressiveness (1=not emotional, 5=very emotional):",
+    ["No answer", 1, 2, 3, 4, 5],
+    key="emotion_rating",
     horizontal=True
 )
 
@@ -86,13 +103,15 @@ rating = st.radio(
 col1, col2 = st.columns(2, gap="small", width="stretch")
 
 
-def save_rating(dataset_name, audio_url, rating):
-    if rating != "No answer":
+def save_rating(dataset_name, audio_url, quality_rating, naturalness_rating, emotion_rating):
+    if quality_rating != "No answer" and naturalness_rating != "No answer" and emotion_rating != "No answer":
         new_row = {
             "user_id": st.session_state.user_id,
             "dataset": dataset_name,
             "audio_url": audio_url,
-            "rating": int(rating)
+            "quality_rating": int(quality_rating),
+            "naturalness_rating": int(naturalness_rating),
+            "emotion_rating": int(emotion_rating)
         }
 
         response = supabase.table("MOS").insert(new_row).execute()
@@ -104,7 +123,9 @@ def save_rating(dataset_name, audio_url, rating):
             st.session_state.current_audio = (dataset_name, audio_url)
 
             time.sleep(1.0)
-            st.session_state.rating = default_rating
+            st.session_state.quality_rating = default_rating
+            st.session_state.naturalness_rating = default_rating
+            st.session_state.emotion_rating = default_rating
 
             return True
         else:
@@ -116,12 +137,12 @@ def save_rating(dataset_name, audio_url, rating):
     return False
 
 with col2:
-    if st.button("Next ➡️", on_click=save_rating, args=(dataset_name, audio_url, rating)):
+    if st.button("Next ➡️", on_click=save_rating, args=(dataset_name, audio_url, quality_rating, naturalness_rating, emotion_rating)):
         st.rerun()
 
 
 with col1:
-    st.button("Safe progress ✅", on_click=save_rating, args=(dataset_name, audio_url, rating))
+    st.button("Safe progress ✅", on_click=save_rating, args=(dataset_name, audio_url, quality_rating, naturalness_rating, emotion_rating))
 
 
 # Footer
